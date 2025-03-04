@@ -1,0 +1,171 @@
+#codigo 1
+
+
+import numpy as np
+import librosa
+import tkinter as tk
+from tkinter import filedialog
+from tkinter import messagebox
+import soundfile as sf
+import matplotlib.pyplot as plt
+from scipy import signal
+
+def cargar_archivo(tipo_archivo):
+    """
+    Función para abrir una ventana de selección de archivos.
+    """
+    file_path = filedialog.askopenfilename(title=f"Selecciona el archivo de audio ({tipo_archivo})", 
+                                           filetypes=[("Archivos de Audio", "*.wav *.mp3 *.m4a")])
+    return file_path
+
+def calcular_snr(señal, ruido):
+    """
+    Función para calcular el SNR (relación señal/ruido).
+    """
+    # Calcular la potencia de la señal
+    P_señal = np.mean(señal ** 2)
+    
+    # Calcular la potencia del ruido
+    P_ruido = np.mean(ruido ** 2)
+    
+    # Calcular SNR en decibelios
+    snr = 10 * np.log10(P_señal / P_ruido)
+    return snr
+
+def analizar_snr():
+    """
+    Función para analizar el SNR y separar la señal del ruido con tres micrófonos.
+    """
+    archivo_mic1 = cargar_archivo('Micrófono 1')
+    archivo_mic2 = cargar_archivo('Micrófono 2')
+    archivo_mic3 = cargar_archivo('Micrófono 3')
+    archivo_ruido = cargar_archivo('Ruido Ambiental')  # Subir el archivo de ruido ambiente
+    
+    if archivo_mic1 and archivo_mic2 and archivo_mic3 and archivo_ruido:
+        try:
+            # Cargar las señales de los tres micrófonos y el ruido ambiental
+            señal_mic1, sr1 = librosa.load(archivo_mic1, sr=None)
+            señal_mic2, sr2 = librosa.load(archivo_mic2, sr=None)
+            señal_mic3, sr3 = librosa.load(archivo_mic3, sr=None)
+            señal_ruido, sr_ruido = librosa.load(archivo_ruido, sr=None)
+
+            min_len = min(len(señal_mic1), len(señal_mic2), len(señal_mic3), len(señal_ruido))
+            señal_mic1 = señal_mic1[:min_len]
+            señal_mic2 = señal_mic2[:min_len]
+            señal_mic3 = señal_mic3[:min_len]
+            señal_ruido = señal_ruido[:min_len]
+            
+            # Calcular SNR de los tres micrófonos respecto al ruido
+            snr_mic1 = calcular_snr(señal_mic1, señal_ruido)
+            snr_mic2 = calcular_snr(señal_mic2, señal_ruido)
+            snr_mic3 = calcular_snr(señal_mic3, señal_ruido)
+
+            # Mostrar los resultados del SNR en un mensaje
+            messagebox.showinfo("SNR de los Micrófonos", f"SNR Micrófono 1: {snr_mic1:.2f} dB\nSNR Micrófono 2: {snr_mic2:.2f} dB\nSNR Micrófono 3: {snr_mic3:.2f} dB")
+            
+            # Realizar análisis temporal y espectral
+            analizar_analisis_temporal_y_espectral(señal_mic1, señal_mic2, señal_mic3, sr1)
+        except Exception as e:
+            messagebox.showerror("Error", f'Ocurrió un error: {str(e)}')
+    else:
+        messagebox.showwarning("Advertencia", "Debe seleccionar los tres archivos de audio y el archivo de ruido ambiental.")
+
+def analizar_analisis_temporal_y_espectral(señal_mic1, señal_mic2, señal_mic3, sr):
+    """
+    Función para realizar el análisis temporal y espectral de las tres señales.
+    """
+    # Análisis temporal de las señales
+    plt.figure(figsize=(15, 10))
+    
+    # Gráfico temporal - Micrófono 1
+    plt.subplot(2, 3, 1)
+    plt.plot(señal_mic1, label="Micrófono 1", color='blue')
+    plt.title("Análisis Temporal - Micrófono 1")
+    plt.xlabel("Tiempo (muestras)")
+    plt.ylabel("Amplitud")
+    plt.legend()
+
+    # Gráfico temporal - Micrófono 2
+    plt.subplot(2, 3, 2)
+    plt.plot(señal_mic2, label="Micrófono 2", color='green')
+    plt.title("Análisis Temporal - Micrófono 2")
+    plt.xlabel("Tiempo (muestras)")
+    plt.ylabel("Amplitud")
+    plt.legend()
+
+    # Gráfico temporal - Micrófono 3
+    plt.subplot(2, 3, 3)
+    plt.plot(señal_mic3, label="Micrófono 3", color='red')
+    plt.title("Análisis Temporal - Micrófono 3")
+    plt.xlabel("Tiempo (muestras)")
+    plt.ylabel("Amplitud")
+    plt.legend()
+
+    # Análisis espectral (usando FFT) y Densidad espectral (Welch) - Micrófono 1
+    fft_mic1 = np.fft.fft(señal_mic1)
+    freqs = np.fft.fftfreq(len(señal_mic1), d=1/sr)
+    half = len(señal_mic1) // 2
+    fft_mic1 = np.abs(fft_mic1[:half])
+    freqs = freqs[:half]
+    
+    # Calcular la densidad espectral usando Welch
+    f1, Pxx_den1 = signal.welch(señal_mic1, fs=sr, nperseg=1024)
+
+    # Gráfico combinado - Micrófono 1 (FFT y Densidad espectral)
+    plt.subplot(2, 3, 4)
+    plt.plot(freqs, fft_mic1, label="FFT Micrófono 1", color='blue')
+    plt.semilogy(f1, Pxx_den1, label="Densidad espectral Micrófono 1 (Welch)", color='cyan', linestyle='--')
+    plt.yscale('log')  # Escala logarítmica en el eje Y
+    plt.title("Análisis Espectral y Densidad Espectral - Micrófono 1")
+    plt.xlabel("Frecuencia (Hz)")
+    plt.ylabel("Magnitud (Escala logarítmica)")
+    plt.legend()
+
+    # Análisis espectral (usando FFT) y Densidad espectral (Welch) - Micrófono 2
+    fft_mic2 = np.fft.fft(señal_mic2)
+    fft_mic2 = np.abs(fft_mic2[:half])
+
+    # Calcular la densidad espectral usando Welch
+    f2, Pxx_den2 = signal.welch(señal_mic2, fs=sr, nperseg=1024)
+
+    # Gráfico combinado - Micrófono 2 (FFT y Densidad espectral)
+    plt.subplot(2, 3, 5)
+    plt.plot(freqs, fft_mic2, label="FFT Micrófono 2", color='green')
+    plt.semilogy(f2, Pxx_den2, label="Densidad espectral Micrófono 2 (Welch)", color='lime', linestyle='--')
+    plt.yscale('log')  # Escala logarítmica en el eje Y
+    plt.title("Análisis Espectral y Densidad Espectral - Micrófono 2")
+    plt.xlabel("Frecuencia (Hz)")
+    plt.ylabel("Magnitud (Escala logarítmica)")
+    plt.legend()
+
+    # Análisis espectral (usando FFT) y Densidad espectral (Welch) - Micrófono 3
+    fft_mic3 = np.fft.fft(señal_mic3)
+    fft_mic3 = np.abs(fft_mic3[:half])
+
+    # Calcular la densidad espectral usando Welch
+    f3, Pxx_den3 = signal.welch(señal_mic3, fs=sr, nperseg=1024)
+
+    # Gráfico combinado - Micrófono 3 (FFT y Densidad espectral)
+    plt.subplot(2, 3, 6)
+    plt.plot(freqs, fft_mic3, label="FFT Micrófono 3", color='red')
+    plt.semilogy(f3, Pxx_den3, label="Densidad espectral Micrófono 3 (Welch)", color='orange', linestyle='--')
+    plt.yscale('log')  # Escala logarítmica en el eje Y
+    plt.title("Análisis Espectral y Densidad Espectral - Micrófono 3")
+    plt.xlabel("Frecuencia (Hz)")
+    plt.ylabel("Magnitud (Escala logarítmica)")
+    plt.legend()
+
+    # Mostrar todas las gráficas
+    plt.tight_layout()
+    plt.show()
+
+# Crear ventana de interfaz gráfica
+root = tk.Tk()
+root.title("Análisis de Audio - Tres Micrófonos")
+
+# Agregar un botón para analizar SNR y realizar análisis de tres micrófonos
+boton_analizar_snr = tk.Button(root, text="Analizar 3 Micrófonos", command=analizar_snr, width=30)
+boton_analizar_snr.pack(pady=20)
+
+# Iniciar la interfaz gráfica
+root.mainloop()
